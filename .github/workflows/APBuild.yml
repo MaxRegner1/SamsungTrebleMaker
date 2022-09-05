@@ -292,18 +292,6 @@ jobs:
          uses: actions/setup-python@v4
          with:
           python-version: "3.10"
-          
-       - name: Download AP Files
-         uses: actions/download-artifact@v3.0.0
-         with:
-          path: D:\a\SamsungTrebleMaker\SamsungTrebleMaker\tar-md5-script-tool
-          name: AP_Files
-        
-       - name: Download Super Image
-         uses: actions/download-artifact@v3.0.0
-         with:
-          path: D:\a\SamsungTrebleMaker\SamsungTrebleMaker\tar-md5-script-tool
-          name: super_image
       
        - name: Build new AP File
          run: |
