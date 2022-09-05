@@ -11,7 +11,7 @@ on:
         required: True
         type: choice
         options:
-          - SM-T225
+          - Motorola Moto One Action
       region:
         description: "Device Region"
         required: true
