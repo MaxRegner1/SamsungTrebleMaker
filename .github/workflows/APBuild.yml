@@ -186,83 +186,25 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get install simg2img lz4 unzip jq
+          sudo apt-get install simg2img lz4 unzip jq p7zip-full
           pip3 install git+https://github.com/samloader/samloader.git
           echo $GITHUB_WORKSPACE
           echo ${{ github.event.inputs.device }}
           echo ${{ github.event.inputs.region }}
       
-      - name: Download and Decrypt Firmware
-        run: |
-          FWFileName="latestFW.zip.enc4"
-          export FMV=$(samloader -m ${{ github.event.inputs.device }} -r ${{ github.event.inputs.region }} checkupdate)
-          echo $FMV
-          echo "Downloading latest update"
-          samloader -m ${{ github.event.inputs.device }} -r ${{ github.event.inputs.region }} download -v $(echo $FMV) -o $(echo $FWFileName)
-          echo "Decrypting Update Files"
-          samloader -m ${{ github.event.inputs.device }} -r ${{ github.event.inputs.region }} decrypt -v $(echo $FMV) -i $(echo $FWFileName) -V 4 -o latestFW.zip
-        
-      - name: Unzip Firmware and Extract AP
-        run: |
-          echo $FMV
-          mkdir APFiles
-          unzip latestFW.zip
-          ls -l
-          mv AP_*.tar.md5 ./APFiles
-          cd APFiles
-          mkdir APExtracted
-          ls -l
-          tar -xf AP_*.tar.md5 --verbose -C ./APExtracted
-          
-      - name: Measure and unpack super image
-        id: superImageSIze
-        run: |
-          cd APFiles/APExtracted
-          export PATH=$PATH:/home/runner/work/SamsungTrebleMaker/SamsungTrebleMaker/otatools/bin/
-          chmod +x /home/runner/work/SamsungTrebleMaker/SamsungTrebleMaker/otatools/bin/lpunpack
-          chmod +x /home/runner/work/SamsungTrebleMaker/SamsungTrebleMaker/otatools/bin/lpmake
-          lz4 -d super.img.lz4 super.img
-          simg2img super.img super.ext4.img
-          OG_SUPER_SIZE=$(stat -c '%s' super.ext4.img)
-          echo "::set-output name=ORIGINAL_SUPER_IMAGE_SIZE::$OG_SUPER_SIZE"
-          mkdir superImageFiles
-          ls -l
-          rm super.img.lz4
-          rm super.img
-          lpunpack super.ext4.img ./superImageFiles
-          rm super.ext4.img
-          rm vbmeta.img.lz4
-      
-      - name: Upload AP Files
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: AP_Files
-          path: APFiles/APExtracted/*.img.lz4
+      - name: download firmware 
+      run: |
+      wget https://mirrors.lolinet.com/firmware/motorola/troika/official/AMXBR/XT2013-1_TROIKA_RETEU_RS_11_RSBS31.Q1-48-36-26_subsidy-DEFAULT_regulatory-DEFAULT_CFC.xml.zip
+      7z x XT2013-1_TROIKA_RETEU_RS_11_RSBS31.Q1-48-36-26_subsidy-DEFAULT_regulatory-DEFAULT_CFC.xml.zip
 
 
       
       - name: Replace old system image and measure size of partitions
         id: imageSizes
         run: |
-          cd APFiles/APExtracted/superImageFiles/
-          rm system.img
-          echo print query
-          echo " ${{ env.URL_QUERY }} "
-          echo run query
-          finalAddress=$(curl -s https://api.github.com/repos/phhusson/treble_experimentations/releases/latest | jq -r " ${{ env.URL_QUERY }} " )
-          echo $finalAddress
-          wget $finalAddress -O system.img.xz
-          xz --decompress system.img.xz
-          ls -l
-          # rm ./system.img.xz
-          ODM_SIZE=$(stat -c '%s' odm.img)
-          SYSTEM_SIZE=$(stat -c '%s' system.img)
-          PRODUCT_SIZE=$(stat -c '%s' product.img)
           VENDOR_SIZE=$(stat -c '%s' vendor.img)
 
-          echo $ODM_SIZE
-          echo $SYSTEM_SIZE
-          echo $PRODUCT_SIZE
+          
           echo $VENDOR_SIZE
           
           echo "::set-output name=ODM_PARTITION_SIZE::$ODM_SIZE"
@@ -297,7 +239,6 @@ jobs:
       - name: Create New Super Image
         id: superImage
         run: |
-          cd APFiles/APExtracted/superImageFiles/
           mkdir ./output
           echo ${{ steps.superImageSize.outputs.ORIGINAL_SUPER_IMAGE_SIZE }}
           lpmake --metadata-size 65536 \
@@ -306,11 +247,6 @@ jobs:
           --device super:${{ steps.superImageSize.outputs.ORIGINAL_SUPER_IMAGE_SIZE }} \
           --group main:${{ env.TOTAL_SIZE }} \
           --partition odm:readonly:${{ steps.imageSizes.outputs.ODM_PARTITION_SIZE }}:main \
-          --image odm=./odm.img \
-          --partition product:readonly:${{ steps.imageSizes.outputs.PRODUCT_PARTITION_SIZE }}:main \
-          --image product=./product.img \
-          --partition system:readonly:${{ steps.imageSizes.outputs.SYSTEM_PARTITION_SIZE }}:main \
-          --image system=./system.img \
           --partition vendor:readonly:${{ steps.imageSizes.outputs.VENDOR_PARTITION_SIZE }}:main \
           --image vendor=./vendor.img \
           --sparse \
